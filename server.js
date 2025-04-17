@@ -1,24 +1,51 @@
-const express = require('express');
-const WebSocket = require('ws');
+// server.js
+const express = require("express");
+const http = require("http");
+const WebSocket = require("ws");
+const cors = require("cors");
+
 const app = express();
+app.use(cors());
 
-const PORT = process.env.PORT || 10000; // Pick any port
-const server = app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
-
+const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-wss.on('connection', (ws) => {
-  console.log('Client connected');
+let currentChar = "a";
 
-  ws.on('message', (message) => {
-    console.log(`Received: ${message}`);
-    // Echo or handle data
-    ws.send(`Server received: ${message}`);
+wss.on("connection", (ws) => {
+  console.log("ESP32 connected via WebSocket");
+
+  // Delay the first message to allow ESP32 to get ready
+  setTimeout(() => {
+    ws.send(currentChar);
+    console.log("Sent to ESP:", currentChar);
+  }, 1000);
+
+  ws.on("message", (message) => {
+    console.log("Received from ESP:", message.toString());
+
+    // Increment the character
+    if (currentChar < "z") {
+      currentChar = String.fromCharCode(currentChar.charCodeAt(0) + 1);
+      ws.send(currentChar);
+      console.log("Sent to ESP:", currentChar);
+    } else {
+      console.log("Reached z. Restarting...");
+      currentChar = "a";
+      ws.send(currentChar);
+    }
   });
 
-  ws.on('close', () => {
-    console.log('Client disconnected');
+  ws.on("close", () => {
+    console.log("ESP32 disconnected");
   });
+});
+
+app.get("/", (req, res) => {
+  res.send("WebSocket server running!");
+});
+
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
 });
